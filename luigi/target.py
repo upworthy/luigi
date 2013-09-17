@@ -79,3 +79,36 @@ class FileSystemTarget(Target):
 
     def remove(self):
         self.fs.remove(self.path)
+
+
+class DefaultTargetFactory(object):
+    """Override this to inject custom behaviour into the creation of targets"""
+    def make_target(self, target_class, *args, **kwargs):
+        return target_class(*args, **kwargs)
+
+
+class TargetFactory(object):
+    """ If you create target implementations with the make_target method of this factory,
+    you'll be able to push alternative implementations to the stack to perform useful
+    functions like mocking and path-prefixing for testing purposes."""
+    _impl_stack = [DefaultTargetFactory()]
+    
+    @classmethod
+    def make_target(cls, target_class, *args, **kwargs):
+        # Walk the factory stack until we find a factory which can generate the required target
+        for factory in reversed(cls._impl_stack):
+            target = factory.make_target(target_class, *args, **kwargs)
+            if target is not None:
+                return target
+
+    @classmethod
+    def push(cls, target_factory):
+        cls._impl_stack.append(target_factory)
+
+    @classmethod
+    def pop(cls):
+        if len(cls._impl_stack) < 2:
+            raise AssertionError("Unable to pop from factory stack as it would"
+                                 "leave the stack empty")
+        cls._impl_stack.pop()
+    
