@@ -81,10 +81,26 @@ class FileSystemTarget(Target):
         self.fs.remove(self.path)
 
 
-class DefaultTargetFactory(object):
-    """Override this to inject custom behaviour into the creation of targets"""
+class TargetFactoryInterface(object):
+    """Interface for injecting custom behaviour into the creation of targets"""
+    __metaclass__ = abc.ABCMeta
+
+    @abc.abstractmethod
+    def make_target(self, target_class, *args, **kwargs):
+        raise NotImplementedError
+
+
+class DefaultTargetFactory(TargetFactoryInterface):
     def make_target(self, target_class, *args, **kwargs):
         return target_class(*args, **kwargs)
+
+
+class TargetObserverInterface(object):
+    """Interface for observing entities created by Luigi."""
+    __metaclass__ = abc.ABCMeta
+
+    def observe_target(self, target):
+        pass
 
 
 class TargetFactory(object):
@@ -92,6 +108,7 @@ class TargetFactory(object):
     you'll be able to push alternative implementations to the stack to perform useful
     functions like mocking and path-prefixing for testing purposes."""
     _impl_stack = [DefaultTargetFactory()]
+    _target_observers = []
     
     @classmethod
     def make_target(cls, target_class, *args, **kwargs):
@@ -99,6 +116,7 @@ class TargetFactory(object):
         for factory in reversed(cls._impl_stack):
             target = factory.make_target(target_class, *args, **kwargs)
             if target is not None:
+                cls._observe(target)
                 return target
 
     @classmethod
@@ -112,3 +130,15 @@ class TargetFactory(object):
                                  "leave the stack empty")
         cls._impl_stack.pop()
     
+    @classmethod
+    def add_target_observer(cls, observer):
+        cls._target_observers.append(observer)
+
+    @classmethod
+    def remove_target_observer(cls, observer):
+        cls._target_observers.remove(observer)
+
+    @classmethod
+    def _observe(cls, target):
+        for obs in cls._target_observers:
+            obs.observe_target(target)
