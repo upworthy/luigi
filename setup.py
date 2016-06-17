@@ -44,6 +44,7 @@ install_requires = [
     'pyparsing',
     'tornado',
     'python-daemon',
+    'rollbar'
 ]
 
 if os.environ.get('READTHEDOCS', None) == 'True':
